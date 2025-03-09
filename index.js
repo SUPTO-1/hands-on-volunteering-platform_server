@@ -6,6 +6,7 @@ const { Pool } = require("pg");
 const port = process.env.PORT || 5000;
 const app = express();
 const { signup, login } = require("./Authentication/authentication");
+const authenticationToken = require("./Authentication Middleware/authenticationToken");
 app.use(express.json());
 app.use(cors());
 
@@ -26,6 +27,7 @@ pool.connect()
     .catch((error) => {
         console.log("Database connection error:", error);
     });
+
 
 app.post('/signup', signup);
 app.post('/login', login);

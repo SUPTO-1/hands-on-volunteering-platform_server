@@ -1,5 +1,6 @@
 require("dotenv").config(); 
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const { Pool } = require("pg");
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -22,6 +23,16 @@ const signup = async (req, res) => {
             [name, email, hashedPassword, skills, causes]
         );
         const newUser = result.rows[0];
+        //creating jwt after user is created
+        const token = jwt.sign(
+            {
+                id: newUser.id,
+                name: newUser.name,
+                email: newUser.email,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        )
         res.status(201).json({ message: "User created successfully", user: newUser });
     } catch (err) {
         console.log(err);
@@ -46,10 +57,20 @@ const login = async (req,res)=>{
         const isMatch = await bcrypt.compare(password,user.hashedpassword);
         if(isMatch)
         {
+            //creating jwt after successful login
+            const token = jwt.sign(
+                {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                },
+                process.env.JWT_SECRET,
+                { expiresIn: "1h" }
+            )
             res.status(200).json({
                 success: true,
                 message: "Login successful",
-                user,
+                user,token
             });
         }
         else
