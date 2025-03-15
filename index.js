@@ -6,7 +6,7 @@ const { Pool } = require("pg");
 const port = process.env.PORT || 5000;
 const app = express();
 const { signup, login } = require("./Authentication/authentication");
-const authenticationToken = require("./Authentication Middleware/authenticationToken");
+const AuthenticationToken = require("./MiddlewareToken/AuthenticationToken");
 app.use(express.json());
 app.use(cors());
 
@@ -17,9 +17,6 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT
 });
-console.log("DB_USER:", process.env.DB_USER);
-console.log("DB_DATABASE:", process.env.DB_DATABASE);
-console.log("DB_PASSWORD:", process.env.DB_PASSWORD);
 pool.connect()
     .then(() => {
         console.log("Database connected");
@@ -28,13 +25,16 @@ pool.connect()
         console.log("Database connection error:", error);
     });
 
-
 app.post('/signup', signup);
 app.post('/login', login);
 app.get("/", (req, res) => {
     res.send("Hello World");
 });
 
+//testing jwt route
+app.get("/profile", AuthenticationToken, (req, res) => {
+    res.json({user: req.user});
+})
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
