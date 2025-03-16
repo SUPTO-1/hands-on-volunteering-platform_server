@@ -8,6 +8,7 @@ const app = express();
 const { signup, login } = require("./Authentication/authentication");
 const AuthenticationToken = require("./MiddlewareToken/AuthenticationToken");
 const addEvent = require("./Events/AddEvent");
+const AddRequest = require("./Requests/AddRequest");
 app.use(express.json());
 app.use(cors());
 
@@ -148,6 +149,9 @@ app.get('/events/:eventId/attendees', async(req,res)=>{
         });
     }
 })
+
+// Community Help Request Starts here
+app.post('/addRequest', AuthenticationToken, AddRequest);
 app.get("/", (req, res) => {
     res.send("Hello World");
 });
