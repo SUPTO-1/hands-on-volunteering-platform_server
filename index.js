@@ -69,7 +69,7 @@ app.post('/events/:eventId/join', AuthenticationToken, async(req,res)=>{
         {
             return res.status(400).json({
                 success: false,
-                message: "You already joined the event"
+                message: "You have already joined the event"
             });
         }
         await pool.query(
@@ -180,6 +180,107 @@ app.get("/", (req, res) => {
     res.send("Hello World");
 });
 
+// Store help response to db
+app.post('/requests/:requestId/response', AuthenticationToken, async(req,res)=>{
+    try
+    {
+        const {requestId} = req.params;
+        const userId = req.user.id;
+        const existingUser = await pool.query
+        (
+            "SELECT * FROM help_offers WHERE request_id = $1 AND user_id = $2",
+            [requestId, userId]
+        );
+        if(existingUser.rows.length > 0)
+        {
+            return res.status(400).json
+            ({
+                success: false,
+                message: "You have already responded to this Community"
+            });
+        }
+        await pool.query
+        (
+            "INSERT INTO help_offers(request_id, user_id) VALUES ($1, $2)",
+            [requestId, userId]
+        )
+        res.json
+        ({
+            success: true,
+            message: "Joined The Community Successfully"
+        });
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json
+        ({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+})
+//single community member
+app.get('/requests/:requestId', async(req,res)=>{
+    try
+    {
+        const {requestId} = req.params;
+        const result = await pool.query
+        (
+            `SELECT help_requests.*, users.name as creator_name
+            FROM help_requests
+            JOIN users ON help_requests.created_by = users.id
+            WHERE help_requests.id = $1
+            `,
+            [requestId]
+        );
+        if(result.rows.length === 0)
+        {
+            return res.status(404).json
+            ({
+                success: false,
+                message: "Request not found"
+            });
+        }
+        res.json({request: result.rows[0]});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json
+        ({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+});
+
+// Members list
+app.get('/requests/:requestId/members', async(req,res)=>{
+    try
+    {
+        const {requestId} = req.params;
+        const result = await pool.query
+        (
+            `SELECT users.name, users.email,users.skills
+            FROM help_offers
+            JOIN users ON help_offers.user_id = users.id
+            WHERE help_offers.request_id = $1
+            `,
+            [requestId]
+        );
+        res.json({members: result.rows});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json
+        ({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+});
 //testing jwt route
 app.get("/profile", AuthenticationToken, (req, res) => {
     res.json({user: req.user});
