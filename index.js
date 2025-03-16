@@ -29,6 +29,29 @@ pool.connect()
 app.post('/signup', signup);
 app.post('/login', login);
 app.post("/addEvent", AuthenticationToken, addEvent);
+
+//get events from api
+app.get("/events", async (req,res)=>{
+    try
+    {
+        const result = await pool.query(
+            `SELECT events.*, users.name as creator_name
+             FROM events
+             JOIN users ON events.created_by = users.id
+             ORDER BY events.created_at DESC
+            `
+        );
+        res.json({events: result.rows});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+})
 app.get("/", (req, res) => {
     res.send("Hello World");
 });
