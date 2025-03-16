@@ -7,6 +7,7 @@ const port = process.env.PORT || 5000;
 const app = express();
 const { signup, login } = require("./Authentication/authentication");
 const AuthenticationToken = require("./MiddlewareToken/AuthenticationToken");
+const addEvent = require("./Events/AddEvent");
 app.use(express.json());
 app.use(cors());
 
@@ -27,6 +28,7 @@ pool.connect()
 
 app.post('/signup', signup);
 app.post('/login', login);
+app.post("/addEvent", AuthenticationToken, addEvent);
 app.get("/", (req, res) => {
     res.send("Hello World");
 });
