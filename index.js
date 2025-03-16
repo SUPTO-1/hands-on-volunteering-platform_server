@@ -52,6 +52,102 @@ app.get("/events", async (req,res)=>{
         });
     }
 })
+
+// added user to event join list
+
+app.post('/events/:eventId/join', AuthenticationToken, async(req,res)=>{
+    try
+    {
+        const {eventId} = req.params;
+        const userId = req.user.id;
+        const existingUser = await pool.query(
+            "SELECT * FROM event_attendees WHERE event_id = $1 AND user_id = $2",
+            [eventId, userId]
+        );
+        if(existingUser.rows.length > 0)
+        {
+            return res.status(400).json({
+                success: false,
+                message: "You already joined the event"
+            });
+        }
+        await pool.query(
+            "INSERT INTO event_attendees(event_id, user_id) VALUES ($1, $2)",
+            [eventId, userId]
+        )
+        res.json
+        ({
+            success: true,
+            message: "joined the event successfully"
+        });
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+})
+
+// single event details
+app.get('/events/:eventId', async(req,res)=>{
+    try
+    {
+        const {eventId} = req.params;
+        const result = await pool.query(
+            `SELECT events.*, users.name as creator_name
+             FROM events
+             JOIN users ON events.created_by = users.id
+             WHERE events.id = $1
+            `,
+            [eventId]
+        );
+        if(result.rows.length === 0)
+        {
+            return res.status(404).json({
+                success: false,
+                message: "Event not found"
+            });
+        }
+        res.json({event: result.rows[0]});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+})
+
+// find out attendance list
+app.get('/events/:eventId/attendees', async(req,res)=>{
+    try
+    {
+        const {eventId} = req.params;
+        const result = await pool.query(
+            `SELECT users.name, users.email, event_attendees.joined_at
+            FROM event_attendees
+            JOIN users ON event_attendees.user_id = users.id
+            WHERE event_attendees.event_id = $1
+            ORDER BY event_attendees.joined_at DESC
+            `,
+            [eventId]
+        );
+        res.json({attendees: result.rows});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+})
 app.get("/", (req, res) => {
     res.send("Hello World");
 });
