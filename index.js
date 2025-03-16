@@ -152,6 +152,30 @@ app.get('/events/:eventId/attendees', async(req,res)=>{
 
 // Community Help Request Starts here
 app.post('/addRequest', AuthenticationToken, AddRequest);
+
+// get request from db
+app.get('/requests', async(req,res)=>{
+    try
+    {
+        const result = await pool.query
+        (
+            `SELECT help_requests.*, users.name as creator_name
+            FROM help_requests
+            JOIN users ON help_requests.created_by = users.id
+            ORDER BY help_requests.created_at DESC
+            `
+        );
+        res.json({requests: result.rows});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+})
 app.get("/", (req, res) => {
     res.send("Hello World");
 });
