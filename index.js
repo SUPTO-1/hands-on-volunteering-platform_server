@@ -281,6 +281,59 @@ app.get('/requests/:requestId/members', async(req,res)=>{
         });
     }
 });
+
+// user will get comments here
+
+app.get("/requests/:requestId/comments", async(req,res)=>{
+    try
+    {
+        const {requestId} = req.params;
+        const result = await pool.query(
+            `SELECT request_comments.*,commenter.name as user_name
+            FROM request_comments
+            JOIN users commenter ON request_comments.user_id = commenter.id
+            WHERE request_comments.request_id = $1
+            ORDER BY request_comments.created_at DESC
+            `,
+            [requestId]
+        );
+        res.json({comments: result.rows});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json({
+            success:false,
+            message: "Internal server error"
+        })
+    }
+});
+
+// user will post comments here
+
+app.post("/requests/:requestId/comments",AuthenticationToken, async(req,res)=>{
+    try
+    {
+        const {requestId} = req.params;
+        const userId = req.user.id;
+        const {content} = req.body;
+        const result = await pool.query(
+            `INSERT INTO request_comments (request_id, user_id, content) VALUES ($1, $2, $3) RETURNING *,
+            (SELECT name FROM users WHERE id = $2) AS user_name`,
+            [requestId, userId, content]
+        );
+        res.json({comment: result.rows[0]});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json({
+            success:false,
+            message: "Internal server error"
+        })
+    }
+});
+
 //testing jwt route
 app.get("/profile", AuthenticationToken, (req, res) => {
     res.json({user: req.user});
