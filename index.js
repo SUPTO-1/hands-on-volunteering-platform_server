@@ -262,7 +262,7 @@ app.get('/requests/:requestId/members', async(req,res)=>{
         const {requestId} = req.params;
         const result = await pool.query
         (
-            `SELECT users.name, users.email,users.skills
+            `SELECT users.id, users.name, users.email,users.skills
             FROM help_offers
             JOIN users ON help_offers.user_id = users.id
             WHERE help_offers.request_id = $1
@@ -335,7 +335,7 @@ app.post("/requests/:requestId/comments",AuthenticationToken, async(req,res)=>{
 });
 
 
-// User will add log hours
+// User will add log hours for event
 
 app.post("/events/:eventId/logHours", AuthenticationToken, async(req,res)=>{
     try
@@ -418,6 +418,73 @@ app.post("/events/:eventId/logHours", AuthenticationToken, async(req,res)=>{
         });
     }
 });
+
+//user will add log hours for community
+app.post("/requests/:requestId/logHours", AuthenticationToken, async (req, res) => {
+    try {
+      const { requestId } = req.params;
+      const { hours } = req.body;
+      const hasResponded = await pool.query(
+        `SELECT * FROM help_offers 
+         WHERE request_id = $1 AND user_id = $2`,
+        [requestId, req.user.id]
+      );
+  
+      if (hasResponded.rows.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Please join the community request first"
+        });
+      }
+      await pool.query(
+        `INSERT INTO volunteer_hours (user_id, request_id, hours)
+         VALUES ($1, $2, $3)`,
+        [req.user.id, requestId, hours]
+      );
+      await pool.query(
+        `INSERT INTO user_points (user_id, total_points, total_hours)
+         VALUES ($1, $2 * 5, $3)
+         ON CONFLICT (user_id)
+         DO UPDATE SET
+           total_points = user_points.total_points + ($2 * 5),
+           total_hours = user_points.total_hours + $3`,
+        [req.user.id, hours, hours]
+      );
+      const totalResult = await pool.query(
+        `SELECT total_hours FROM user_points WHERE user_id = $1`,
+        [req.user.id]
+      );
+      const totalHours = totalResult.rows[0].total_hours;
+      const milestones = [20, 50, 100, 150, 200];
+      
+      for (const milestone of milestones) {
+        if (totalHours >= milestone) {
+          const certCheck = await pool.query(
+            `SELECT id FROM certificates 
+             WHERE user_id = $1 AND hours_milestone = $2`,
+            [req.user.id, milestone]
+          );
+          
+          if (certCheck.rows.length === 0) {
+            await pool.query(
+              `INSERT INTO certificates (user_id, hours_milestone)
+               VALUES ($1, $2)`,
+              [req.user.id, milestone]
+            );
+          }
+        }
+      }
+  
+      res.json({ success: true, message: "Hours logged successfully" });
+  
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error"
+      });
+    }
+  });
 // user view profile
 
 app.get('/viewProfile', AuthenticationToken, async (req, res) => {
