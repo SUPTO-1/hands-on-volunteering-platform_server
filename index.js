@@ -130,7 +130,7 @@ app.get('/events/:eventId/attendees', async(req,res)=>{
     {
         const {eventId} = req.params;
         const result = await pool.query(
-            `SELECT users.name, users.email, event_attendees.joined_at
+            `SELECT users.id, users.name, users.email, event_attendees.joined_at
             FROM event_attendees
             JOIN users ON event_attendees.user_id = users.id
             WHERE event_attendees.event_id = $1
@@ -333,6 +333,50 @@ app.post("/requests/:requestId/comments",AuthenticationToken, async(req,res)=>{
         })
     }
 });
+
+
+// User will add log hours
+
+app.post("/events/:eventId/logHours", AuthenticationToken, async(req,res)=>{
+    try
+    {
+        const {eventId} = req.params;
+        const {hours} = req.body;
+
+        const isAttendee = await pool.query
+        (
+            `SELECT * FROM event_attendees
+            WHERE event_id = $1 AND user_id = $2`,
+            [eventId, req.user.id]
+        );
+
+        if(isAttendee.rows.length === 0)
+        {
+            return res.status(400).json
+            ({
+                success: false,
+                message: "Please join the event first"
+            });
+        }
+
+        const result = await pool.query
+        (
+            `INSERT INTO volunteer_hours (user_id, event_id, hours)
+            VALUES ($1, $2, $3) RETURNING *`,
+            [req.user.id, eventId, hours]
+        );
+        res.json({volunteerHours: result.rows[0]});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json
+        ({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+})
 
 //testing jwt route
 app.get("/profile", AuthenticationToken, (req, res) => {
