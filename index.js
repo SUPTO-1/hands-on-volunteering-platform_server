@@ -149,7 +149,6 @@ app.get('/events/:eventId/attendees', async(req,res)=>{
         });
     }
 })
-
 // Community Help Request Starts here
 app.post('/addRequest', AuthenticationToken, AddRequest);
 
@@ -365,6 +364,16 @@ app.post("/events/:eventId/logHours", AuthenticationToken, async(req,res)=>{
             VALUES ($1, $2, $3) RETURNING *`,
             [req.user.id, eventId, hours]
         );
+
+        await pool.query(
+            `INSERT INTO user_points (user_id, total_points, total_hours)
+             VALUES ($1, $2 * 5, $3)
+             ON CONFLICT (user_id)
+             DO UPDATE SET
+             total_points = user_points.total_points + ($2 * 5),
+             total_hours = user_points.total_hours + $3`,
+            [req.user.id, hours, hours]
+          );
         res.json({volunteerHours: result.rows[0]});
     }
     catch(err)
@@ -376,7 +385,47 @@ app.post("/events/:eventId/logHours", AuthenticationToken, async(req,res)=>{
             message: "Internal server error"
         });
     }
-})
+});
+// user view profile
+
+app.get('/viewProfile', AuthenticationToken, async (req, res) => {
+    try {
+        console.log('[1] Received profile request for user:', req.user);
+        const userId = parseInt(req.user.id, 10);
+        console.log('[2] Converted user ID:', userId, '(Type:', typeof userId + ')');
+
+      const [points, certificates] = await Promise.all([
+        pool.query('SELECT * FROM user_points WHERE user_id = $1', [userId]),
+        pool.query('SELECT * FROM certificates WHERE user_id = $1', [userId]),
+      ]);
+      
+      res.json({
+        points: points.rows[0] || { total_points: 0, total_hours: 0 },
+        certificates: certificates.rows
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to load profile" });
+    }
+  });
+  
+//  leader detils will Show ...........
+app.get('/leaderboard', async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT users.id, users.name, 
+               user_points.total_points,
+               user_points.total_hours
+        FROM user_points
+        JOIN users ON user_points.user_id = users.id
+        ORDER BY user_points.total_points DESC
+        LIMIT 100
+      `);
+      res.json({ leaderboard: result.rows });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load leaderboard" });
+    }
+  });
 
 //testing jwt route
 app.get("/profile", AuthenticationToken, (req, res) => {
