@@ -9,6 +9,7 @@ const { signup, login } = require("./Authentication/authentication");
 const AuthenticationToken = require("./MiddlewareToken/AuthenticationToken");
 const addEvent = require("./Events/AddEvent");
 const AddRequest = require("./Requests/AddRequest");
+const PDFDocument = require('pdfkit');
 app.use(express.json());
 app.use(cors());
 
@@ -375,6 +376,37 @@ app.post("/events/:eventId/logHours", AuthenticationToken, async(req,res)=>{
             [req.user.id, hours, hours]
           );
         res.json({volunteerHours: result.rows[0]});
+
+        const totalResult = await pool.query
+        (
+            `SELECT total_hours FROM user_points WHERE user_id = $1`,
+            [req.user.id]
+        );
+        const totalHours = totalResult.rows[0].total_hours;
+        const mileStones = [20,50,100,150,200];
+        for(const milestone of mileStones)
+        {
+            if(totalHours >= milestone)
+            {
+                const certificateCheck = await pool.query
+                (
+                    `SELECT id FROM certificates WHERE user_id = $1
+                    AND hours_milestone = $2`,
+                    [req.user.id, milestone]
+                );
+
+                if(certificateCheck.rows.length === 0)
+                {
+                    await pool.query
+                    (
+                        `INSERT INTO certificates
+                        (user_id, hours_milestone)
+                        VALUES ($1, $2)`,
+                        [req.user.id, milestone]
+                    );
+                }
+            }
+        }
     }
     catch(err)
     {
@@ -390,9 +422,7 @@ app.post("/events/:eventId/logHours", AuthenticationToken, async(req,res)=>{
 
 app.get('/viewProfile', AuthenticationToken, async (req, res) => {
     try {
-        console.log('[1] Received profile request for user:', req.user);
         const userId = parseInt(req.user.id, 10);
-        console.log('[2] Converted user ID:', userId, '(Type:', typeof userId + ')');
 
       const [points, certificates] = await Promise.all([
         pool.query('SELECT * FROM user_points WHERE user_id = $1', [userId]),
@@ -406,6 +436,37 @@ app.get('/viewProfile', AuthenticationToken, async (req, res) => {
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Failed to load profile" });
+    }
+  });
+
+  // Certificate
+app.get('/certificates/:certId', AuthenticationToken, async (req, res) => {
+    try {
+      const cert = await pool.query(
+        `SELECT c.*, u.name 
+         FROM certificates c
+         JOIN users u ON c.user_id = u.id
+         WHERE c.id = $1`,
+        [req.params.certId]
+      );
+  
+      if (!cert.rows.length || cert.rows[0].user_id !== req.user.id) {
+        return res.status(404).json({ error: "Certificate not found" });
+      }
+      const doc = new PDFDocument();
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=certificate-${req.params.certId}.pdf`);
+      doc.pipe(res);
+      doc.fontSize(25).text('Volunteer Certificate', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(18).text(`Awarded to: ${cert.rows[0].name}`);
+      doc.text(`For completing ${cert.rows[0].hours_milestone} volunteer hours`);
+      doc.text(`Awarded on: ${new Date(cert.rows[0].awarded_at).toLocaleDateString()}`);
+      doc.end();
+  
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to generate certificate" });
     }
   });
   

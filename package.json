@@ -17,6 +17,7 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
+    "pdfkit": "^0.16.0",
     "pg": "^8.13.3"
   },
   "devDependencies": {
