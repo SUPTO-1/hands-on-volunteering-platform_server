@@ -555,6 +555,31 @@ app.get('/leaderboard', async (req, res) => {
     }
   });
 
+//Creating Teams
+
+app.post("/addTeam", AuthenticationToken, async(req,res)=>{
+    try
+    {
+        const {name, description, type} = req.body;
+        const userId = req.user.id;
+        const result = await pool.query
+        (
+            `INSERT INTO teams (name,description, team_type, created_by) VALUES ($1, $2, $3, $4) RETURNING *`,
+            [name, description, type, userId]
+        );
+        res.json({team: result.rows[0]});
+    }
+    catch(err)
+    {
+        console.log(err);
+        res.status(500).json
+        ({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+})
+
 //testing jwt route
 app.get("/profile", AuthenticationToken, (req, res) => {
     res.json({user: req.user});
