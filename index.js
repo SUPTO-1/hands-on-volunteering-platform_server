@@ -567,6 +567,12 @@ app.post("/addTeam", AuthenticationToken, async(req,res)=>{
             `INSERT INTO teams (name,description, team_type, created_by) VALUES ($1, $2, $3, $4) RETURNING *`,
             [name, description, type, userId]
         );
+        await pool.query
+        (
+            `INSERT INTO team_members(team_id, user_id)
+             VALUES ($1, $2)`,
+            [result.rows[0].id, userId]
+        )
         res.json({team: result.rows[0]});
     }
     catch(err)
@@ -579,7 +585,80 @@ app.post("/addTeam", AuthenticationToken, async(req,res)=>{
         });
     }
 })
-
+// fetch team
+app.get('/teams', AuthenticationToken, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const result = await pool.query(`
+        SELECT t.*, u.name as creator_name,
+               EXISTS(SELECT 1 FROM team_members WHERE team_id = t.id AND user_id = $1) as is_member
+        FROM teams t
+        JOIN users u ON t.created_by = u.id
+        WHERE t.team_type = 'Public' 
+           OR EXISTS(SELECT 1 FROM team_members WHERE team_id = t.id AND user_id = $1)
+      `, [userId]);
+      res.json({ teams: result.rows });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load teams" });
+    }
+  });
+  
+  // user can join team
+  app.post('/teams/:teamId/join', AuthenticationToken, async (req, res) => {
+    try {
+      const { teamId } = req.params;
+      await pool.query(
+        `INSERT INTO team_members (team_id, user_id)
+         VALUES ($1, $2)`,
+        [teamId, req.user.id]
+      );
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to join team" });
+    }
+  });
+  
+  // Get team members
+  app.get('/teams/:teamId/members', AuthenticationToken, async (req, res) => {
+    try {
+      const { teamId } = req.params;
+      const result = await pool.query(`
+        SELECT u.id, u.name, u.email, tm.joined_at
+        FROM team_members tm
+        JOIN users u ON tm.user_id = u.id
+        WHERE tm.team_id = $1
+      `, [teamId]);
+      res.json({ members: result.rows });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load members" });
+    }
+  });
+  
+  // Add team member by email
+  app.post('/teams/:teamId/members', AuthenticationToken, async (req, res) => {
+    try {
+      const { teamId } = req.params;
+      const { email } = req.body;
+      const team = await pool.query('SELECT created_by FROM teams WHERE id = $1', [teamId]);
+      if (team.rows[0].created_by !== req.user.id) {
+        return res.status(403).json({ error: "Only team creator can add members" });
+      }
+      const user = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+      if (!user.rows.length) {
+        return res.status(404).json({ error: "User not found" });
+      }
+  
+      await pool.query(
+        `INSERT INTO team_members (team_id, user_id)
+         VALUES ($1, $2)`,
+        [teamId, user.rows[0].id]
+      );
+      
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to add member" });
+    }
+  });
 //testing jwt route
 app.get("/profile", AuthenticationToken, (req, res) => {
     res.json({user: req.user});
