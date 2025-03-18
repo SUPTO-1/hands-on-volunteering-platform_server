@@ -486,25 +486,62 @@ app.post("/requests/:requestId/logHours", AuthenticationToken, async (req, res) 
     }
   });
 // user view profile
-
 app.get('/viewProfile', AuthenticationToken, async (req, res) => {
-    try {
-        const userId = parseInt(req.user.id, 10);
+  try {
+      const userId = parseInt(req.user.id, 10);
 
-      const [points, certificates] = await Promise.all([
-        pool.query('SELECT * FROM user_points WHERE user_id = $1', [userId]),
-        pool.query('SELECT * FROM certificates WHERE user_id = $1', [userId]),
-      ]);
-      
-      res.json({
-        points: points.rows[0] || { total_points: 0, total_hours: 0 },
-        certificates: certificates.rows
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to load profile" });
-    }
-  });
+    const [points, certificates, userData] = await Promise.all([
+      pool.query('SELECT * FROM user_points WHERE user_id = $1', [userId]),
+      pool.query('SELECT * FROM certificates WHERE user_id = $1', [userId]),
+      pool.query('SELECT name, email, skills, causes FROM users WHERE id = $1', [userId])
+    ]);
+    
+    res.json({
+      points: points.rows[0] || { total_points: 0, total_hours: 0 },
+      certificates: certificates.rows,
+      user: userData.rows[0]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+// updateProfile route
+app.put('/updateProfile', AuthenticationToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, skills, causes } = req.body;
+    const cleanData = (arr) => 
+      Array.isArray(arr) ? arr.join(', ') : arr;
+
+    const result = await pool.query(
+      `UPDATE users SET
+          name = $1,
+          skills = $2,
+          causes = $3
+       WHERE id = $4
+       RETURNING id, name, email, skills, causes`,
+      [
+        name,
+        cleanData(skills),
+        cleanData(causes),
+        userId
+      ]
+    );
+    res.status(200).json({ 
+      success: true,
+      user: result.rows[0]
+    });
+    
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to update profile" 
+    });
+  }
+});
 
   // Certificate
 app.get('/certificates/:certId', AuthenticationToken, async (req, res) => {

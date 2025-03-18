@@ -51,6 +51,7 @@ const login = async (req,res)=>{
                 { expiresIn: "1h" }
             );
             const { hashedpassword, ...userWithoutPassword } = user;
+            //console.log(token);
             res.status(200).json({
                 success: true,
                 message: "User logged in successfully",
