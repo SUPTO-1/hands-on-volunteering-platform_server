@@ -233,7 +233,6 @@ CREATE TABLE team_members (
 3. Set up environment variables:
    Create a `.env` file and add the following:
    ```env
-   PORT=5000
    DB_USER=your_db_user_name
    DB_HOST=localhost
    DB_PORT=your_db_port
@@ -251,6 +250,7 @@ CREATE TABLE team_members (
 5. Start the backend server:
    ```bash
    node index.js
+   Backend Must have to run in 5000 PORT
    ```
 
 ## API Documentation
