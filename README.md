@@ -250,7 +250,7 @@ CREATE TABLE team_members (
 
 5. Start the backend server:
    ```bash
-   npm run dev
+   node index.js
    ```
 
 ## API Documentation
